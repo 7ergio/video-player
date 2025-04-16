@@ -71,15 +71,20 @@
               <path d="M19.07 4.93C20.9447 6.80528 21.9979 9.34836 21.9979 12C21.9979 14.6516 20.9447 17.1947 19.07 19.07" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
-          <input 
-            type="range" 
-            min="0" 
-            max="1" 
-            step="0.1" 
-            class="volume-slider"
-            v-model="volume"
-            @input="updateVolume"
-          >
+          
+          <div class="volume-slider-container">
+            <div class="volume-slider-fill" :style="{ width: volumePercentage + '%' }"></div>
+            <input 
+              type="range" 
+              min="0" 
+              max="1" 
+              step="0.1" 
+              class="volume-slider"
+              v-model="volume"
+              @input="updateVolume"
+            >
+          </div>
+          
           <span class="volume-percentage">{{ Math.round(volume * 100) }}%</span>
         </div>
         
@@ -98,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 
 const videoUrl = 'https://meetyoo-code-challenge.s3.eu-central-1.amazonaws.com/live/S14JJ9Z6PKoO/bf1d4883-5305-4d65-a299-cbb654ef1ed9/video.webm';
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -111,6 +116,12 @@ const progress = ref(0);
 const volume = ref(1);
 const previousVolume = ref(1); // Store previous volume level
 const isMuted = ref(false);
+const isFullscreen = ref(false);
+
+// Computed properties
+const volumePercentage = computed(() => {
+  return volume.value * 100;
+});
 
 // Event handlers
 function onTimeUpdate() {
@@ -211,6 +222,28 @@ function toggleFullscreen() {
   }
 }
 
+// Handle fullscreen changes
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement;
+  
+  // When exiting fullscreen, update volume and mute states from the video element
+  if (!isFullscreen.value && videoRef.value) {
+    // Update mute state
+    isMuted.value = videoRef.value.muted;
+    
+    // If muted, set volume display to 0 while preserving previousVolume
+    if (isMuted.value) {
+      volume.value = 0;
+    } else {
+      volume.value = videoRef.value.volume;
+      // If volume > 0, update previous volume
+      if (volume.value > 0) {
+        previousVolume.value = volume.value;
+      }
+    }
+  }
+}
+
 // Format time in MM:SS format
 function formatTime(timeInSeconds: number): string {
   if (isNaN(timeInSeconds)) return '0:00';
@@ -256,18 +289,45 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function onVolumeChange() {
+  if (videoRef.value) {
+    // Update our state from the video element
+    volume.value = videoRef.value.volume;
+    isMuted.value = videoRef.value.muted;
+    
+    // If volume > 0, update previous volume
+    if (volume.value > 0) {
+      previousVolume.value = volume.value;
+    }
+  }
+}
+
 onMounted(() => {
   if (videoRef.value) {
     console.log('Video element is mounted');
     
     // Add keyboard event listener
     window.addEventListener('keydown', handleKeydown);
+    
+    // Add fullscreen change listener
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    
+    // Add volume change listener
+    videoRef.value.addEventListener('volumechange', onVolumeChange);
   }
 });
 
 onUnmounted(() => {
   // Remove keyboard event listener when component is destroyed
   window.removeEventListener('keydown', handleKeydown);
+  
+  // Remove fullscreen change listener
+  document.removeEventListener('fullscreenchange', onFullscreenChange);
+  
+  // Remove volume change listener
+  if (videoRef.value) {
+    videoRef.value.removeEventListener('volumechange', onVolumeChange);
+  }
 });
 </script>
 
@@ -387,13 +447,60 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       
-      .volume-slider {
+      .volume-slider-container {
+        position: relative;
         width: 60px;
+        height: 4px;
         margin-left: 5px;
         
-        // Hide on mobile
         @media (max-width: 480px) {
           display: none;
+        }
+      }
+      
+      .volume-slider-fill {
+        position: absolute;
+        height: 100%;
+        background-color: white;
+        border-radius: 2px;
+        pointer-events: none;
+        z-index: 1;
+      }
+      
+      .volume-slider {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.3);
+        outline: none;
+        border-radius: 2px;
+        margin: 0;
+        z-index: 2;
+        
+        &::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 12px;
+          height: 12px;
+          background: white;
+          border-radius: 50%;
+          cursor: pointer;
+          position: relative;
+          z-index: 3;
+        }
+        
+        &::-moz-range-thumb {
+          width: 12px;
+          height: 12px;
+          background: white;
+          border-radius: 50%;
+          cursor: pointer;
+          border: none;
+          z-index: 3;
         }
       }
       
@@ -403,7 +510,6 @@ onUnmounted(() => {
         margin-left: 5px;
         font-family: monospace;
         
-        // Hide on mobile
         @media (max-width: 768px) {
           display: none;
         }
