@@ -109,6 +109,7 @@ const currentTime = ref(0);
 const duration = ref(0);
 const progress = ref(0);
 const volume = ref(1);
+const previousVolume = ref(1); // Store previous volume level
 const isMuted = ref(false);
 
 // Event handlers
@@ -157,6 +158,11 @@ function updateVolume() {
   if (videoRef.value) {
     videoRef.value.volume = volume.value;
     
+    // When the volume is not 0, save it as the previous volume
+    if (volume.value > 0) {
+      previousVolume.value = volume.value;
+    }
+    
     // Set muted state when volume is set to 0
     if (volume.value == 0) {
       isMuted.value = true;
@@ -172,18 +178,25 @@ function updateVolume() {
 function toggleMute() {
   if (videoRef.value) {
     // If currently muted
-    if (isMuted.value || volume.value == 0) {
+    if (isMuted.value) {
+      // Unmute and restore previous volume
       isMuted.value = false;
       videoRef.value.muted = false;
       
-      // If volume was 0, set it to 1
-      if (volume.value == 0) {
-        volume.value = 1;
-        videoRef.value.volume = 1;
-      }
+      // Restore to previous volume, or 100% if previous was 0
+      volume.value = previousVolume.value > 0 ? previousVolume.value : 1;
+      videoRef.value.volume = volume.value;
     } else {
+      // Save current volume before muting
+      previousVolume.value = volume.value;
+      
+      // Mute the video
       isMuted.value = true;
       videoRef.value.muted = true;
+      
+      // Visually show 0% on the slider
+      volume.value = 0;
+      videoRef.value.volume = 0;
     }
   }
 }
