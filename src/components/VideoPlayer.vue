@@ -60,7 +60,7 @@
         <!-- Volume control -->
         <div class="volume-control">
           <button class="control-button" @click="toggleMute">
-            <svg v-if="isMuted || volume === 0" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg v-if="isMuted || volume == 0" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M23 9L17 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M17 9L23 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -80,6 +80,7 @@
             v-model="volume"
             @input="updateVolume"
           >
+          <span class="volume-percentage">{{ Math.round(volume * 100) }}%</span>
         </div>
         
         <!-- Fullscreen button -->
@@ -97,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 
 const videoUrl = 'https://meetyoo-code-challenge.s3.eu-central-1.amazonaws.com/live/S14JJ9Z6PKoO/bf1d4883-5305-4d65-a299-cbb654ef1ed9/video.webm';
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -155,13 +156,13 @@ function seek(event: MouseEvent) {
 function updateVolume() {
   if (videoRef.value) {
     videoRef.value.volume = volume.value;
-
-    // Change the logo if the volume set to 0
+    
+    // Set muted state when volume is set to 0
     if (volume.value == 0) {
       isMuted.value = true;
-      videoRef.value.muted = true
+      videoRef.value.muted = true;
     } else if (isMuted.value) {
-      // Unmute if volume is changed and was previously muted
+      // Unmute if volume is changed to > 0 and was previously muted
       isMuted.value = false;
       videoRef.value.muted = false;
     }
@@ -206,6 +207,55 @@ function formatTime(timeInSeconds: number): string {
   
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
+
+// Add keyboard event handler for accessibility reasons
+function handleKeydown(event: KeyboardEvent) {
+  if (!videoRef.value) return;
+  
+  switch (event.key) {
+    case ' ': // Space
+    case 'k': // YouTube-style shortcuts
+      togglePlay();
+      event.preventDefault();
+      break;
+    case 'ArrowUp':
+      // Increase volume by 10%
+      volume.value = Math.min(1, volume.value + 0.1);
+      updateVolume();
+      event.preventDefault();
+      break;
+    case 'ArrowDown':
+      // Decrease volume by 10%
+      volume.value = Math.max(0, volume.value - 0.1);
+      updateVolume();
+      event.preventDefault();
+      break;
+    case 'm':
+      // Toggle mute
+      toggleMute();
+      event.preventDefault();
+      break;
+    case 'f':
+      // Toggle fullscreen
+      toggleFullscreen();
+      event.preventDefault();
+      break;
+  }
+}
+
+onMounted(() => {
+  if (videoRef.value) {
+    console.log('Video element is mounted');
+    
+    // Add keyboard event listener
+    window.addEventListener('keydown', handleKeydown);
+  }
+});
+
+onUnmounted(() => {
+  // Remove keyboard event listener when component is destroyed
+  window.removeEventListener('keydown', handleKeydown);
+});
 </script>
 
 <style lang="scss" scoped>
@@ -330,6 +380,18 @@ function formatTime(timeInSeconds: number): string {
         
         // Hide on mobile
         @media (max-width: 480px) {
+          display: none;
+        }
+      }
+      
+      .volume-percentage {
+        min-width: 40px;
+        font-size: 12px;
+        margin-left: 5px;
+        font-family: monospace;
+        
+        // Hide on mobile
+        @media (max-width: 768px) {
           display: none;
         }
       }
