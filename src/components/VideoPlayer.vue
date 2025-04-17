@@ -1,28 +1,26 @@
 <template>
   <div class="video-container">
-    <!-- Video element without native controls -->
+    <!-- Video element -->
     <video 
       ref="videoRef" 
       class="video-player"
       preload="metadata"
-      @click="togglePlay"
+      @click="videoPlayer.togglePlay"
       @timeupdate="onTimeUpdate"
       @loadedmetadata="onLoadedMetadata"
-      @play="isPlaying = true"
-      @pause="isPlaying = false"
+      @play="onPlay"
+      @pause="onPause"
+      @volumechange="onVolumeChange"
     >
-      <source 
-        :src="videoUrl" 
-        type="video/webm"
-      >
+      <source :src="videoPlayer.videoUrl" type="video/webm">
       Your browser does not support the video tag.
     </video>
     
-    <!-- Play button overlay when paused -->
+    <!-- Play button overlay -->
     <div 
-      v-if="!isPlaying" 
+      v-if="!videoPlayer.state.isPlaying" 
       class="play-overlay"
-      @click="togglePlay"
+      @click="videoPlayer.togglePlay"
     >
       <div class="play-button">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -31,17 +29,17 @@
       </div>
     </div>
     
-    <!-- Custom controls -->
+    <!-- Video controls -->
     <div class="video-controls">
       <!-- Progress bar -->
-      <div class="progress-bar" @click="seek">
-        <div class="progress" :style="{ width: `${progress}%` }"></div>
+      <div class="progress-bar" @click="videoPlayer.seek">
+        <div class="progress" :style="{ width: `${videoPlayer.state.progress}%` }"></div>
       </div>
       
       <div class="controls-container">
         <!-- Play/Pause button -->
-        <button class="control-button" @click="togglePlay">
-          <svg v-if="isPlaying" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <button class="control-button" @click="videoPlayer.togglePlay">
+          <svg v-if="videoPlayer.state.isPlaying" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 4H6V20H10V4Z" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M18 4H14V20H18V4Z" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -52,15 +50,15 @@
         
         <!-- Time display -->
         <div class="time-display">
-          <span>{{ formatTime(currentTime) }}</span>
+          <span>{{ videoPlayer.formatTime(videoPlayer.state.currentTime) }}</span>
           <span class="time-separator">/</span>
-          <span>{{ formatTime(duration) }}</span>
+          <span>{{ videoPlayer.formatTime(videoPlayer.state.duration) }}</span>
         </div>
         
         <!-- Volume control -->
         <div class="volume-control">
-          <button class="control-button" @click="toggleMute">
-            <svg v-if="isMuted || volume == 0" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <button class="control-button" @click="videoPlayer.toggleMute">
+            <svg v-if="videoPlayer.state.isMuted || videoPlayer.state.volume === 0" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M23 9L17 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M17 9L23 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -73,23 +71,23 @@
           </button>
           
           <div class="volume-slider-container">
-            <div class="volume-slider-fill" :style="{ width: volumePercentage + '%' }"></div>
+            <div class="volume-slider-fill" :style="{ width: videoPlayer.volumePercentage.value + '%' }"></div>
             <input 
               type="range" 
               min="0" 
               max="1" 
               step="0.1" 
               class="volume-slider"
-              v-model="volume"
-              @input="updateVolume"
+              :value="videoPlayer.state.volume"
+              @input="onVolumeInput"
             >
           </div>
           
-          <span class="volume-percentage">{{ Math.round(volume * 100) }}%</span>
+          <span class="volume-percentage">{{ Math.round(videoPlayer.state.volume * 100) }}%</span>
         </div>
         
         <!-- Fullscreen button -->
-        <button class="control-button" @click="toggleFullscreen">
+        <button class="control-button" @click="videoPlayer.toggleFullscreen">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M8 3H2V9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M16 3H22V9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -103,230 +101,54 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted } from 'vue';
+import useVideoPlayer from '../composables/useVideoPlayer';
 
-const videoUrl = 'https://meetyoo-code-challenge.s3.eu-central-1.amazonaws.com/live/S14JJ9Z6PKoO/bf1d4883-5305-4d65-a299-cbb654ef1ed9/video.webm';
+// Local ref for video element
 const videoRef = ref<HTMLVideoElement | null>(null);
 
-// Video state
-const isPlaying = ref(false);
-const currentTime = ref(0);
-const duration = ref(0);
-const progress = ref(0);
-const volume = ref(1);
-const previousVolume = ref(1); // Store previous volume level
-const isMuted = ref(false);
-const isFullscreen = ref(false);
+// Initialize the video player
+const videoPlayer = useVideoPlayer('https://meetyoo-code-challenge.s3.eu-central-1.amazonaws.com/live/S14JJ9Z6PKoO/bf1d4883-5305-4d65-a299-cbb654ef1ed9/video.webm');
 
-// Computed properties
-const volumePercentage = computed(() => {
-  return volume.value * 100;
-});
-
-// Event handlers
+// Pass events to the video player
 function onTimeUpdate() {
   if (videoRef.value) {
-    currentTime.value = videoRef.value.currentTime;
-    progress.value = (currentTime.value / duration.value) * 100;
+    videoPlayer.state.currentTime = videoRef.value.currentTime;
+    videoPlayer.state.progress = (videoPlayer.state.currentTime / videoPlayer.state.duration) * 100;
   }
 }
 
 function onLoadedMetadata() {
   if (videoRef.value) {
-    duration.value = videoRef.value.duration;
+    videoPlayer.state.duration = videoRef.value.duration;
   }
 }
 
-function togglePlay() {
-  if (videoRef.value) {
-    if (isPlaying.value) {
-      videoRef.value.pause();
-    } else {
-      videoRef.value.play();
-    }
-  }
+function onPlay() {
+  videoPlayer.state.isPlaying = true;
 }
 
-function seek(event: MouseEvent) {
-  if (videoRef.value) {
-    const progressBar = event.currentTarget as HTMLElement;
-    const rect = progressBar.getBoundingClientRect();
-    const clickPosition = event.clientX - rect.left;
-    const percentage = (clickPosition / rect.width) * 100;
-    
-    // Ensure percentage is between 0 and 100
-    const clampedPercentage = Math.max(0, Math.min(100, percentage));
-    
-    // Calculate the time based on percentage of duration
-    const newTime = (clampedPercentage / 100) * duration.value;
-    
-    // Set the video's current time
-    videoRef.value.currentTime = newTime;
-  }
-}
-
-function updateVolume() {
-  if (videoRef.value) {
-    videoRef.value.volume = volume.value;
-    
-    // When the volume is not 0, save it as the previous volume
-    if (volume.value > 0) {
-      previousVolume.value = volume.value;
-    }
-    
-    // Set muted state when volume is set to 0
-    if (volume.value == 0) {
-      isMuted.value = true;
-      videoRef.value.muted = true;
-    } else if (isMuted.value) {
-      // Unmute if volume is changed to > 0 and was previously muted
-      isMuted.value = false;
-      videoRef.value.muted = false;
-    }
-  }
-}
-
-function toggleMute() {
-  if (videoRef.value) {
-    // If currently muted
-    if (isMuted.value) {
-      // Unmute and restore previous volume
-      isMuted.value = false;
-      videoRef.value.muted = false;
-      
-      // Restore to previous volume, or 100% if previous was 0
-      volume.value = previousVolume.value > 0 ? previousVolume.value : 1;
-      videoRef.value.volume = volume.value;
-    } else {
-      // Save current volume before muting
-      previousVolume.value = volume.value;
-      
-      // Mute the video
-      isMuted.value = true;
-      videoRef.value.muted = true;
-      
-      // Visually show 0% on the slider
-      volume.value = 0;
-      videoRef.value.volume = 0;
-    }
-  }
-}
-
-function toggleFullscreen() {
-  if (videoRef.value) {
-    if (!document.fullscreenElement) {
-      videoRef.value.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  }
-}
-
-// Handle fullscreen changes
-function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement;
-  
-  // When exiting fullscreen, update volume and mute states from the video element
-  if (!isFullscreen.value && videoRef.value) {
-    // Update mute state
-    isMuted.value = videoRef.value.muted;
-    
-    // If muted, set volume display to 0 while preserving previousVolume
-    if (isMuted.value) {
-      volume.value = 0;
-    } else {
-      volume.value = videoRef.value.volume;
-      // If volume > 0, update previous volume
-      if (volume.value > 0) {
-        previousVolume.value = volume.value;
-      }
-    }
-  }
-}
-
-// Format time in MM:SS format
-function formatTime(timeInSeconds: number): string {
-  if (isNaN(timeInSeconds)) return '0:00';
-  
-  const minutes = Math.floor(timeInSeconds / 60);
-  const seconds = Math.floor(timeInSeconds % 60);
-  
-  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-}
-
-// Add keyboard event handler for accessibility reasons
-function handleKeydown(event: KeyboardEvent) {
-  if (!videoRef.value) return;
-  
-  switch (event.key) {
-    case ' ': // Space
-    case 'k': // YouTube-style shortcuts
-      togglePlay();
-      event.preventDefault();
-      break;
-    case 'ArrowUp':
-      // Increase volume by 10%
-      volume.value = Math.min(1, volume.value + 0.1);
-      updateVolume();
-      event.preventDefault();
-      break;
-    case 'ArrowDown':
-      // Decrease volume by 10%
-      volume.value = Math.max(0, volume.value - 0.1);
-      updateVolume();
-      event.preventDefault();
-      break;
-    case 'm':
-      // Toggle mute
-      toggleMute();
-      event.preventDefault();
-      break;
-    case 'f':
-      // Toggle fullscreen
-      toggleFullscreen();
-      event.preventDefault();
-      break;
-  }
+function onPause() {
+  videoPlayer.state.isPlaying = false;
 }
 
 function onVolumeChange() {
   if (videoRef.value) {
-    // Update our state from the video element
-    volume.value = videoRef.value.volume;
-    isMuted.value = videoRef.value.muted;
-    
-    // If volume > 0, update previous volume
-    if (volume.value > 0) {
-      previousVolume.value = volume.value;
-    }
+    videoPlayer.state.volume = videoRef.value.volume;
+    videoPlayer.state.isMuted = videoRef.value.muted;
   }
 }
 
+// Handle volume slider input
+function onVolumeInput(event: Event) {
+  const target = event.target as HTMLInputElement;
+  videoPlayer.updateVolume(parseFloat(target.value));
+}
+
+// Set video ref when component is mounted
 onMounted(() => {
   if (videoRef.value) {
-    console.log('Video element is mounted');
-    
-    // Add keyboard event listener
-    window.addEventListener('keydown', handleKeydown);
-    
-    // Add fullscreen change listener
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    
-    // Add volume change listener
-    videoRef.value.addEventListener('volumechange', onVolumeChange);
-  }
-});
-
-onUnmounted(() => {
-  // Remove keyboard event listener when component is destroyed
-  window.removeEventListener('keydown', handleKeydown);
-  
-  // Remove fullscreen change listener
-  document.removeEventListener('fullscreenchange', onFullscreenChange);
-  
-  // Remove volume change listener
-  if (videoRef.value) {
-    videoRef.value.removeEventListener('volumechange', onVolumeChange);
+    videoPlayer.videoRef.value = videoRef.value;
   }
 });
 </script>
