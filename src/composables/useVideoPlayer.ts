@@ -24,10 +24,18 @@ export default function useVideoPlayer(videoUrl: string) {
   function formatTime(timeInSeconds: number): string {
     if (isNaN(timeInSeconds)) return '0:00';
     
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
+    // Convert to integer seconds
+    const totalSeconds = Math.floor(timeInSeconds);
     
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    } else {
+      return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
   }
   
   // Video controls
