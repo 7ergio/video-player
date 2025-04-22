@@ -31,9 +31,20 @@
     
     <!-- Video controls -->
     <div class="video-controls">
-      <!-- Progress bar -->
+      <!-- Progress bar with chapter markers -->
       <div class="progress-bar" @click="videoPlayer.seek">
         <div class="progress" :style="{ width: `${videoPlayer.state.progress}%` }"></div>
+        
+        <!-- Chapter markers -->
+        <div 
+          v-for="chapter in chaptersList"
+          :key="chapter.id"
+          class="chapter-marker"
+          :class="{ 'active': chapterManager.currentChapter && chapterManager.currentChapter.id === chapter.id }"
+          :style="{ left: `${chapterManager.getChapterPosition(chapter, videoPlayer.state.duration)}%` }"
+          :title="chapter.title"
+          @click.stop="seekToChapter(chapter)"
+        ></div>
       </div>
       
       <div class="controls-container">
@@ -53,6 +64,11 @@
           <span>{{ videoPlayer.formatTime(videoPlayer.state.currentTime) }}</span>
           <span class="time-separator">/</span>
           <span>{{ videoPlayer.formatTime(videoPlayer.state.duration) }}</span>
+        </div>
+        
+        <!-- Current chapter label -->
+        <div v-if="chapterManager.currentChapter" class="current-chapter">
+          <span>{{ chapterManager.currentChapter.title }}</span>
         </div>
         
         <!-- Volume control -->
@@ -86,6 +102,13 @@
           <span class="volume-percentage">{{ Math.round(videoPlayer.state.volume * 100) }}%</span>
         </div>
         
+        <!-- Chapter menu button -->
+        <button class="control-button" @click="chapterManager.toggleChapterMenu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6H20M4 12H20M4 18H20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        
         <!-- Fullscreen button -->
         <button class="control-button" @click="videoPlayer.toggleFullscreen">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -97,12 +120,34 @@
         </button>
       </div>
     </div>
+    
+    <!-- Chapter menu -->
+    <div v-if="chapterManager.showChapterMenu" class="chapter-menu">
+      <div class="chapter-menu-header">
+        <h3>Chapters</h3>
+        <button class="close-button" @click="chapterManager.toggleChapterMenu">×</button>
+      </div>
+      <div class="chapter-list">
+        <div 
+          v-for="chapter in chaptersList"
+          :key="chapter.id"
+          class="chapter-item"
+          :class="{ 'active': chapterManager.currentChapter && chapterManager.currentChapter.id === chapter.id }"
+          @click="seekToChapter(chapter)"
+        >
+          <span class="chapter-time">{{ videoPlayer.formatTime(chapter.startTime) }}</span>
+          <span class="chapter-title">{{ chapter.title }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import useVideoPlayer from '../composables/useVideoPlayer';
+import useChapters from '../composables/useChapters';
+import type { Chapter } from '../composables/useChapters';
 
 // Local ref for video element
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -110,11 +155,22 @@ const videoRef = ref<HTMLVideoElement | null>(null);
 // Initialize the video player
 const videoPlayer = useVideoPlayer('https://meetyoo-code-challenge.s3.eu-central-1.amazonaws.com/live/S14JJ9Z6PKoO/bf1d4883-5305-4d65-a299-cbb654ef1ed9/video.webm');
 
+// Initialize the chapter manager
+const chapterManager = useChapters();
+
+// Create a computed property to safely access the chapters array
+const chaptersList = computed<Chapter[]>(() => {
+  return Array.isArray(chapterManager.chapters.value) ? chapterManager.chapters.value : [];
+});
+
 // Pass events to the video player
 function onTimeUpdate() {
   if (videoRef.value) {
     videoPlayer.state.currentTime = videoRef.value.currentTime;
     videoPlayer.state.progress = (videoPlayer.state.currentTime / videoPlayer.state.duration) * 100;
+    
+    // Update current chapter
+    chapterManager.updateCurrentChapter(videoPlayer.state.currentTime);
   }
 }
 
@@ -145,11 +201,22 @@ function onVolumeInput(event: Event) {
   videoPlayer.updateVolume(parseFloat(target.value));
 }
 
-// Set video ref when component is mounted
-onMounted(() => {
+// Seek to specific chapter
+function seekToChapter(chapter: Chapter) {
+  if (videoRef.value) {
+    videoRef.value.currentTime = chapter.startTime;
+    chapterManager.toggleChapterMenu();
+  }
+}
+
+// Set video ref and fetch chapters when component is mounted
+onMounted(async () => {
   if (videoRef.value) {
     videoPlayer.videoRef.value = videoRef.value;
   }
+  
+  // Fetch chapters
+  await chapterManager.fetchChapters();
 });
 </script>
 
@@ -233,6 +300,27 @@ onMounted(() => {
       background-color: var(--primary, #0064FF);
       border-radius: 2.5px;
     }
+    
+    .chapter-marker {
+      position: absolute;
+      top: 0;
+      width: 4px;
+      height: 100%;
+      background-color: var(--accent, #00B5AD);
+      transform: translateX(-50%);
+      cursor: pointer;
+      z-index: 2;
+      transition: height 0.2s ease, background-color 0.2s ease;
+      
+      &.active {
+        background-color: #FFFFFF;
+      }
+      
+      &:hover {
+        height: 10px;
+        top: -2.5px;
+      }
+    }
   }
   
   .controls-container {
@@ -262,6 +350,19 @@ onMounted(() => {
       
       .time-separator {
         margin: 0 3px;
+      }
+    }
+    
+    .current-chapter {
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 14px;
+      opacity: 0.9;
+      
+      @media (max-width: 768px) {
+        display: none;
       }
     }
     
@@ -337,6 +438,84 @@ onMounted(() => {
         }
       }
     }
+  }
+}
+
+.chapter-menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 300px;
+  max-height: 70%;
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  
+  .chapter-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    
+    h3 {
+      margin: 0;
+      color: white;
+      font-size: 16px;
+    }
+    
+    .close-button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+  }
+  
+  .chapter-list {
+    max-height: calc(70vh - 40px);
+    overflow-y: auto;
+    
+    .chapter-item {
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      
+      &.active {
+        background-color: rgba(0, 100, 255, 0.3);
+      }
+      
+      .chapter-time {
+        min-width: 50px;
+        font-family: monospace;
+        color: white;
+        opacity: 0.7;
+        margin-right: 10px;
+      }
+      
+      .chapter-title {
+        color: white;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+  
+  @media (max-width: 768px) {
+    width: 250px;
   }
 }
 </style>
