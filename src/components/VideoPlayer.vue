@@ -40,7 +40,7 @@
           v-for="chapter in chaptersList"
           :key="chapter.id"
           class="chapter-marker"
-          :class="{ 'active': chapterManager.currentChapter && chapterManager.currentChapter.id === chapter.id }"
+          :class="{ 'active': chapterManager.currentChapter.value?.id === chapter.id }"
           :style="{ left: `${chapterManager.getChapterPosition(chapter, videoPlayer.state.duration)}%` }"
           :title="chapter.title"
           @click.stop="seekToChapter(chapter)"
@@ -67,8 +67,8 @@
         </div>
         
         <!-- Current chapter label -->
-        <div v-if="chapterManager.currentChapter" class="current-chapter">
-          <span>{{ chapterManager.currentChapter.title }}</span>
+        <div v-if="chapterManager.currentChapter.value" class="current-chapter">
+          <span>{{ chapterManager.currentChapter.value.title }}</span>
         </div>
         
         <!-- Volume control -->
@@ -122,7 +122,7 @@
     </div>
     
     <!-- Chapter menu -->
-    <div v-if="chapterManager.showChapterMenu" class="chapter-menu">
+    <div v-if="chapterManager.showChapterMenu.value" class="chapter-menu">
       <div class="chapter-menu-header">
         <h3>Chapters</h3>
         <button class="close-button" @click="chapterManager.toggleChapterMenu">×</button>
@@ -132,7 +132,7 @@
           v-for="chapter in chaptersList"
           :key="chapter.id"
           class="chapter-item"
-          :class="{ 'active': chapterManager.currentChapter && chapterManager.currentChapter.id === chapter.id }"
+          :class="{ 'active': chapterManager.currentChapter.value?.id === chapter.id }"
           @click="seekToChapter(chapter)"
         >
           <span class="chapter-time">{{ videoPlayer.formatTime(chapter.startTime) }}</span>
@@ -205,7 +205,6 @@ function onVolumeInput(event: Event) {
 function seekToChapter(chapter: Chapter) {
   if (videoRef.value) {
     videoRef.value.currentTime = chapter.startTime;
-    chapterManager.toggleChapterMenu();
   }
 }
 
