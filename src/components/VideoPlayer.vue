@@ -29,6 +29,13 @@
       </div>
     </div>
     
+    <!-- Caption overlay -->
+    <div v-if="transcriptManager.showCaptions.value && transcriptManager.currentCaption.value" class="caption-overlay">
+      <div class="caption-text">
+        {{ transcriptManager.currentCaption.value.text }}
+      </div>
+    </div>
+    
     <!-- Video controls -->
     <div class="video-controls">
       <!-- Progress bar with chapter markers -->
@@ -87,7 +94,7 @@
           </button>
           
           <div class="volume-slider-container">
-            <div class="volume-slider-fill" :style="{ width: videoPlayer.volumePercentage.value + '%' }"></div>
+            <div class="volume-slider-fill" :style="{ width: volumePercentage + '%' }"></div>
             <input 
               type="range" 
               min="0" 
@@ -106,6 +113,20 @@
         <button class="control-button" @click="chapterManager.toggleChapterMenu">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 6H20M4 12H20M4 18H20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        
+        <!-- Caption toggle button -->
+        <button 
+          class="control-button" 
+          @click="transcriptManager.toggleCaptions" 
+          :class="{ 'active': transcriptManager.showCaptions.value }"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 4H5C3.89543 4 3 4.89543 3 6V18C3 19.1046 3.89543 20 5 20H19C20.1046 20 21 19.1046 21 18V6C21 4.89543 20.1046 4 19 4Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 9H12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M7 13H17" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M14 9H17" stroke="white" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </button>
         
@@ -147,6 +168,7 @@
 import { ref, computed, onMounted } from 'vue';
 import useVideoPlayer from '../composables/useVideoPlayer';
 import useChapters from '../composables/useChapters';
+import useTranscript from '../composables/useTranscript';
 import type { Chapter } from '../composables/useChapters';
 
 // Local ref for video element
@@ -158,9 +180,17 @@ const videoPlayer = useVideoPlayer('https://meetyoo-code-challenge.s3.eu-central
 // Initialize the chapter manager
 const chapterManager = useChapters();
 
+// Initialize the transcript manager
+const transcriptManager = useTranscript();
+
 // Create a computed property to safely access the chapters array
 const chaptersList = computed<Chapter[]>(() => {
   return Array.isArray(chapterManager.chapters.value) ? chapterManager.chapters.value : [];
+});
+
+// Computed property for volume percentage
+const volumePercentage = computed(() => {
+  return videoPlayer.state.volume * 100;
 });
 
 // Pass events to the video player
@@ -171,6 +201,9 @@ function onTimeUpdate() {
     
     // Update current chapter
     chapterManager.updateCurrentChapter(videoPlayer.state.currentTime);
+    
+    // Update current caption
+    transcriptManager.updateCurrentCaption(videoPlayer.state.currentTime);
   }
 }
 
@@ -208,7 +241,7 @@ function seekToChapter(chapter: Chapter) {
   }
 }
 
-// Set video ref and fetch chapters when component is mounted
+// Set video ref and fetch chapters and transcript when component is mounted
 onMounted(async () => {
   if (videoRef.value) {
     videoPlayer.videoRef.value = videoRef.value;
@@ -216,6 +249,9 @@ onMounted(async () => {
   
   // Fetch chapters
   await chapterManager.fetchChapters();
+  
+  // Fetch transcript
+  await transcriptManager.fetchTranscript();
 });
 </script>
 
@@ -272,6 +308,26 @@ onMounted(async () => {
     &:hover {
       transform: scale(1.1);
     }
+  }
+}
+
+.caption-overlay {
+  position: absolute;
+  bottom: 70px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  z-index: 5;
+  
+  .caption-text {
+    display: inline-block;
+    max-width: 80%;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 16px;
+    text-align: center;
   }
 }
 
@@ -340,6 +396,15 @@ onMounted(async () => {
       
       &:hover {
         opacity: 0.8;
+      }
+      
+      &.active {
+        color: var(--primary, #0064FF);
+        svg {
+          path {
+            stroke: var(--primary, #0064FF);
+          }
+        }
       }
     }
     
