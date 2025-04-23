@@ -63,18 +63,21 @@ import VideoPlayer from './components/VideoPlayer.vue';
 
 ## Accessibility
 
-The video player includes several accessibility features:
+The video player implements several accessibility features to ensure it can be used by people with disabilities:
 
-- Keyboard controls for all major functions
-- ARIA roles and labels on interactive elements
+- ARIA attributes for screen reader compatibility
+- Keyboard navigation support for all controls
+- Focus management with visible focus indicators
+- Proper semantic roles and labels
+- Caption support for hearing-impaired users
 - Color contrast that meets WCAG standards
-- Focus states for keyboard navigation
-- Visual indicators synchronized with audio content (captions)
 
-## Performance
+## Responsive Design
 
-- Lazy loading of resources
-- Efficient event handling
-- Minimal DOM updates
-- Responsive design with mobile-first approach
-- Small bundle size with no unnecessary dependencies
+The player is built with a mobile-first approach:
+
+- Adapts to all screen sizes from mobile to desktop
+- Optimized controls for touch devices
+- Repositioned captions on mobile to avoid obscuring content
+- Full-screen chapter menu on mobile for better usability
+- Larger touch targets on smaller screens
