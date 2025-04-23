@@ -11,6 +11,8 @@
       @play="onPlay"
       @pause="onPause"
       @volumechange="onVolumeChange"
+      aria-label="Video player"
+      tabindex="0"
     >
       <source :src="videoPlayer.videoUrl" type="video/webm">
       Your browser does not support the video tag.
@@ -39,7 +41,17 @@
     <!-- Video controls -->
     <div class="video-controls">
       <!-- Progress bar with chapter markers -->
-      <div class="progress-bar" @click="videoPlayer.seek">
+      <div 
+        class="progress-bar" 
+        @click="videoPlayer.seek"
+        role="slider"
+        aria-label="Video progress"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-valuenow="videoPlayer.state.progress"
+        tabindex="0"
+        @keydown="handleProgressKeydown"
+      >
         <div class="progress" :style="{ width: `${videoPlayer.state.progress}%` }"></div>
         
         <!-- Chapter markers -->
@@ -56,7 +68,12 @@
       
       <div class="controls-container">
         <!-- Play/Pause button -->
-        <button class="control-button" @click="videoPlayer.togglePlay">
+        <button 
+          class="control-button" 
+          @click="videoPlayer.togglePlay"
+          aria-label="Play video"
+          :aria-pressed="videoPlayer.state.isPlaying"
+        >
           <svg v-if="videoPlayer.state.isPlaying" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 4H6V20H10V4Z" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M18 4H14V20H18V4Z" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -67,7 +84,7 @@
         </button>
         
         <!-- Time display -->
-        <div class="time-display">
+        <div class="time-display" aria-live="polite">
           <span>{{ videoPlayer.formatTime(videoPlayer.state.currentTime) }}</span>
           <span class="time-separator">/</span>
           <span>{{ videoPlayer.formatTime(videoPlayer.state.duration) }}</span>
@@ -80,7 +97,12 @@
         
         <!-- Volume control -->
         <div class="volume-control">
-          <button class="control-button" @click="videoPlayer.toggleMute">
+          <button 
+            class="control-button" 
+            @click="videoPlayer.toggleMute"
+            aria-label="Mute"
+            :aria-pressed="videoPlayer.state.isMuted"
+          >
             <svg v-if="videoPlayer.state.isMuted || videoPlayer.state.volume === 0" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M23 9L17 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -103,6 +125,10 @@
               class="volume-slider"
               :value="videoPlayer.state.volume"
               @input="onVolumeInput"
+              aria-label="Volume"
+              :aria-valuemin="0"
+              :aria-valuemax="1"
+              :aria-valuenow="videoPlayer.state.volume"
             >
           </div>
           
@@ -110,7 +136,13 @@
         </div>
         
         <!-- Chapter menu button -->
-        <button class="control-button" @click="chapterManager.toggleChapterMenu">
+        <button 
+          class="control-button" 
+          @click="chapterManager.toggleChapterMenu"
+          aria-label="Show chapters"
+          aria-haspopup="true"
+          :aria-expanded="chapterManager.showChapterMenu.value"
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 6H20M4 12H20M4 18H20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -119,8 +151,9 @@
         <!-- Caption toggle button -->
         <button 
           class="control-button" 
-          @click="transcriptManager.toggleCaptions" 
-          :class="{ 'active': transcriptManager.showCaptions.value }"
+          @click="transcriptManager.toggleCaptions"
+          aria-label="Toggle captions"
+          :aria-pressed="transcriptManager.showCaptions.value"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M19 4H5C3.89543 4 3 4.89543 3 6V18C3 19.1046 3.89543 20 5 20H19C20.1046 20 21 19.1046 21 18V6C21 4.89543 20.1046 4 19 4Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -131,7 +164,11 @@
         </button>
         
         <!-- Fullscreen button -->
-        <button class="control-button" @click="videoPlayer.toggleFullscreen">
+        <button 
+          class="control-button" 
+          @click="videoPlayer.toggleFullscreen"
+          aria-label="Toggle fullscreen"
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M8 3H2V9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M16 3H22V9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -143,10 +180,19 @@
     </div>
     
     <!-- Chapter menu -->
-    <div v-if="chapterManager.showChapterMenu.value" class="chapter-menu">
+    <div 
+      v-if="chapterManager.showChapterMenu.value" 
+      class="chapter-menu"
+      role="menu"
+      aria-label="Chapters"
+    >
       <div class="chapter-menu-header">
         <h3>Chapters</h3>
-        <button class="close-button" @click="chapterManager.toggleChapterMenu">×</button>
+        <button 
+          class="close-button" 
+          @click="chapterManager.toggleChapterMenu"
+          aria-label="Close chapters menu"
+        >×</button>
       </div>
       <div class="chapter-list">
         <div 
@@ -155,6 +201,10 @@
           class="chapter-item"
           :class="{ 'active': chapterManager.currentChapter.value?.id === chapter.id }"
           @click="seekToChapter(chapter)"
+          role="menuitem"
+          tabindex="0"
+          @keydown.enter="seekToChapter(chapter)"
+          @keydown.space.prevent="seekToChapter(chapter)"
         >
           <span class="chapter-time">{{ videoPlayer.formatTime(chapter.startTime) }}</span>
           <span class="chapter-title">{{ chapter.title }}</span>
@@ -234,6 +284,27 @@ function onVolumeInput(event: Event) {
   videoPlayer.updateVolume(parseFloat(target.value));
 }
 
+// Handle keyboard navigation for progress bar
+function handleProgressKeydown(event: KeyboardEvent) {
+  if (!videoRef.value) return;
+  
+  const duration = videoPlayer.state.duration;
+  let currentTime = videoPlayer.state.currentTime;
+  
+  switch (event.key) {
+    case 'ArrowRight':
+      currentTime = Math.min(duration, currentTime + 5);
+      videoRef.value.currentTime = currentTime;
+      event.preventDefault();
+      break;
+    case 'ArrowLeft':
+      currentTime = Math.max(0, currentTime - 5);
+      videoRef.value.currentTime = currentTime;
+      event.preventDefault();
+      break;
+  }
+}
+
 // Seek to specific chapter
 function seekToChapter(chapter: Chapter) {
   if (videoRef.value) {
@@ -241,7 +312,7 @@ function seekToChapter(chapter: Chapter) {
   }
 }
 
-// Set video ref and fetch chapters and transcript when component is mounted
+// Set video ref and fetch chapters when component is mounted
 onMounted(async () => {
   if (videoRef.value) {
     videoPlayer.videoRef.value = videoRef.value;
@@ -398,13 +469,10 @@ onMounted(async () => {
         opacity: 0.8;
       }
       
-      &.active {
-        color: var(--primary, #0064FF);
-        svg {
-          path {
-            stroke: var(--primary, #0064FF);
-          }
-        }
+      &:focus-visible {
+        outline: 2px solid var(--primary, #0064FF);
+        outline-offset: 2px;
+        border-radius: 4px;
       }
     }
     
@@ -489,6 +557,10 @@ onMounted(async () => {
           border: none;
           z-index: 3;
         }
+        
+        &:focus-visible {
+          outline: 2px solid var(--primary, #0064FF);
+        }
       }
       
       .volume-percentage {
@@ -537,6 +609,11 @@ onMounted(async () => {
       cursor: pointer;
       padding: 0;
       line-height: 1;
+      
+      &:focus-visible {
+        outline: 2px solid var(--primary, #0064FF);
+        border-radius: 4px;
+      }
     }
   }
   
@@ -560,6 +637,11 @@ onMounted(async () => {
         background-color: rgba(0, 100, 255, 0.3);
       }
       
+      &:focus-visible {
+        outline: 2px solid var(--primary, #0064FF);
+        outline-offset: -2px;
+      }
+      
       .chapter-time {
         min-width: 50px;
         font-family: monospace;
@@ -581,5 +663,10 @@ onMounted(async () => {
   @media (max-width: 768px) {
     width: 250px;
   }
+}
+
+.progress-bar:focus-visible {
+  outline: 2px solid var(--primary, #0064FF);
+  outline-offset: 2px;
 }
 </style>
