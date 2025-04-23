@@ -31,6 +31,16 @@
       </div>
     </div>
     
+    <!-- Caption overlay inside video on desktop -->
+    <div 
+      v-if="transcriptManager.showCaptions.value && transcriptManager.currentCaption.value" 
+      class="caption-overlay"
+    >
+      <div class="caption-text">
+        {{ transcriptManager.currentCaption.value.text }}
+      </div>
+    </div>
+    
     <!-- Video controls -->
     <div class="video-controls">
       <!-- Progress bar with chapter markers -->
@@ -100,7 +110,6 @@
               @click="videoPlayer.toggleMute"
               aria-label="Mute"
               :aria-pressed="videoPlayer.state.isMuted"
-              :class="{ 'active': videoPlayer.state.isMuted }"
             >
               <svg v-if="videoPlayer.state.isMuted || videoPlayer.state.volume === 0" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -216,9 +225,9 @@
     </div>
   </div>
   
-  <!-- Caption overlay below video on mobile -->
-  <div v-if="transcriptManager.showCaptions.value && transcriptManager.currentCaption.value" class="caption-overlay">
-    <div class="caption-text">
+  <!-- Mobile-only caption container (shown below video) -->
+  <div v-if="transcriptManager.showCaptions.value && transcriptManager.currentCaption.value" class="mobile-caption-container">
+    <div class="mobile-caption-text">
       {{ transcriptManager.currentCaption.value.text }}
     </div>
   </div>
@@ -397,15 +406,11 @@ onMounted(async () => {
     }
   }
   
-  /* On mobile, make the container have normal flow for captions */
+  /* Always keep video container as a proper container */
   @media (max-width: 767px) {
-    overflow: visible; /* Allow captions to show below */
-    
-    /* Make video player itself have overflow hidden, not the container */
-    .video-player {
-      border-radius: 8px;
-      overflow: hidden;
-    }
+    /* Keep overflow hidden for proper styling */
+    overflow: hidden;
+    border-radius: 8px;
   }
 }
 
@@ -460,7 +465,7 @@ onMounted(async () => {
   }
 }
 
-/* Caption overlay - Now outside the video container on mobile */
+/* Caption overlay inside video on desktop */
 .caption-overlay {
   position: absolute;
   bottom: 70px;
@@ -468,6 +473,7 @@ onMounted(async () => {
   width: 100%;
   text-align: center;
   z-index: 5;
+  pointer-events: none; /* Allow click-through to video */
   
   .caption-text {
     display: inline-block;
@@ -478,21 +484,35 @@ onMounted(async () => {
     border-radius: 4px;
     font-size: 16px;
     text-align: center;
+    user-select: none; /* Prevent selection */
   }
   
-  /* On mobile, move captions below the video */
+  /* Hide on mobile screens - we'll use the mobile-only container instead */
   @media (max-width: 767px) {
-    position: static;
+    display: none;
+  }
+}
+
+/* Mobile-only caption container (shown below video) */
+.mobile-caption-container {
+  display: none; /* Hidden by default on desktop */
+  
+  /* Only show on mobile */
+  @media (max-width: 767px) {
+    display: block;
+    width: 100%;
     margin-top: 10px;
     padding: 0;
+    text-align: center;
     
-    .caption-text {
+    .mobile-caption-text {
       background-color: var(--secondary, #002D5C);
-      max-width: 100%;
       width: 100%;
       border-radius: 4px;
       padding: 8px 0;
       font-size: 14px;
+      color: white;
+      text-align: center;
     }
   }
 }
@@ -585,7 +605,7 @@ onMounted(async () => {
       }
     }
     
-          /* On very small screens, better organize the controls */
+    /* On very small screens, better organize the controls */
     @media (max-width: 360px) {
       flex-wrap: wrap;
       justify-content: center;
